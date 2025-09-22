@@ -44,7 +44,6 @@ jobs:
       - name: Build and push frontend image
         uses: docker/build-push-action@v6
         with:
-          # frontend is repo root (since no ./frontend folder exists)
           context: .
           file: ./Dockerfile
           push: true
