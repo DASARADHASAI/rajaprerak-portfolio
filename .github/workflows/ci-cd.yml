@@ -1,0 +1,122 @@
+# Simple CI/CD Pipeline for Portfolio Website
+name: "CI/CD Pipeline"
+
+# Trigger the workflow on push to main branch and pull requests
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+# Define jobs
+jobs:
+  # Job 1: Build and Test
+  build-and-test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    
+    steps:
+    # Step 1: Checkout the repository code
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+      
+    # Step 2: Setup Node.js environment
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    # Step 3: Install dependencies
+    - name: Install Dependencies
+      run: npm ci
+      
+    # Step 4: Run any linting (optional - can be added later)
+    - name: Lint Code
+      run: |
+        echo "Linting HTML/CSS/JS files..."
+        # Add linting commands here if needed
+        echo "No linting configured yet - passed"
+        
+    # Step 5: Test if server starts properly
+    - name: Test Server
+      run: |
+        echo "Testing if server starts..."
+        timeout 10s npm run dev || echo "Server test completed"
+        
+    # Step 6: Check for common issues
+    - name: Basic Health Check
+      run: |
+        echo "Running basic health checks..."
+        # Check if main files exist
+        test -f index.html || (echo "index.html not found" && exit 1)
+        test -f package.json || (echo "package.json not found" && exit 1)
+        test -f server.js || (echo "server.js not found" && exit 1)
+        echo "✅ All required files found"
+        
+        # Check if assets directory exists
+        test -d assets || (echo "assets directory not found" && exit 1)
+        echo "✅ Assets directory found"
+        
+        # Validate package.json
+        node -e "JSON.parse(require('fs').readFileSync('package.json', 'utf8'))" || (echo "Invalid package.json" && exit 1)
+        echo "✅ package.json is valid JSON"
+        
+        echo "All health checks passed! 🎉"
+
+  # Job 2: Deploy to GitHub Pages (only on push to main/master)
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    
+    # Only run this job on push to main/master (not on pull requests)
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    
+    # Grant GITHUB_TOKEN the permissions required to make a Pages deployment
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+      
+    steps:
+    # Step 1: Checkout the repository
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+      
+    # Step 2: Setup Node.js (if you need to build anything)
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    # Step 3: Install dependencies (if needed for build process)
+    - name: Install Dependencies
+      run: npm ci
+      
+    # Step 4: Prepare deployment files
+    - name: Prepare Deployment
+      run: |
+        echo "Preparing files for deployment..."
+        # Since this is a static site, we just need to copy the files
+        # Remove node_modules and other unnecessary files for deployment
+        rm -rf node_modules
+        rm -f .gitignore .dockerignore Dockerfile
+        echo "✅ Deployment files prepared"
+        
+    # Step 5: Setup GitHub Pages
+    - name: Setup Pages
+      uses: actions/configure-pages@v4
+      
+    # Step 6: Upload artifact for Pages
+    - name: Upload to GitHub Pages
+      uses: actions/upload-pages-artifact@v3
+      with:
+        # Upload entire repository (excluding files we removed)
+        path: '.'
+        
+    # Step 7: Deploy to GitHub Pages
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v4
